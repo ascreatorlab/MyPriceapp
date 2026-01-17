@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FLYING RKS</title>
+<style>
+html,body { height:100%; margin:0; font-family:Arial,Helvetica,sans-serif; background:#000; }
+#wrap { width:100%; max-width:480px; height:820px; margin:12px auto; background:#111; border-radius:8px; overflow:hidden; position:relative; box-shadow:0 8px 30px rgba(0,0,0,0.6); }
+canvas { width:100%; height:100%; display:block; background: linear-gradient(#87CEEB,#f1c27d); }
+#hud { position:absolute; left:12px; top:12px; color:#fff; font-weight:700; text-shadow:0 1px 3px rgba(0,0,0,0.6); z-index:20; font-size: clamp(12px, 2.8vw, 18px); }
+#msg { position:absolute; left:50%; transform:translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); color:white; text-align:center; z-index:20; font-weight:700; font-size: clamp(13px, 3.2vw, 18px); text-shadow:0 2px 6px rgba(0,0,0,0.5);}
+button.small { padding:8px 12px; border-radius:8px; border:none; background:#2b8cff; color:white; font-weight:700; font-size: clamp(12px,2.9vw,16px);}
+#go { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:30; padding-bottom: calc(10px + env(safe-area-inset-bottom,0px)); }
+#go img { max-width:70%; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.6);}
+#go .caption { margin-top:10px; color:#fff; font-weight:700; text-align:center; font-size: clamp(14px, 3.5vw, 22px); text-shadow:0 2px 6px rgba(0,0,0,0.5);}
+@media (max-width:420px){ #wrap{height:720px;} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="hud">FLYING RKS — Score: <span id="score">0</span></div>
+  <div id="msg">Tap to start · Tap to flap<br><button id="mute" class="small">Mute</button></div>
+  <div id="go">
+    <div style="text-align:center">
+      <img id="goImg" src="assets/gameover.png" />
+      <div class="caption">Score: <span id="finalScore">0</span><br>Double tap to restart</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const msgEl = document.getElementById('msg');
+const muteBtn = document.getElementById('mute');
+const go = document.getElementById('go');
+const finalScoreEl = document.getElementById('finalScore');
+
+const W = 420, H = 780;
+canvas.width = W; canvas.height = H;
+
+let score = 0, running = false, over = false, obstacleTimer = 0;
+const OBST_INTERVAL = 1500, OBST_SPEED = 160, GRAVITY = 1000, FLAP_V = -360, OBST_W = 90, GAP = 220;
+
+const player = { x:110, y:H/2, w:72, h:72, vy:0, faceImg:null };
+let obstacles = [];
+let gfImg = null, bgImg = null, muted = false;
+
+// Double-tap restart
+let restartArmed = false, lastTapTime = 0, DOUBLE_TAP_MS = 350;
+
+// --- Flap SFX ---
+const flapSfx = new Audio('assets/sfx/flap.mp3');
+flapSfx.volume = 0.9;
+
+// --- Game Over SFX ---
+const loseSfx = new Audio('assets/sfx/loss.mp3');
+loseSfx.volume = 1.0;
+
+function playSfx(a){ const n=a.cloneNode(); n.volume=a.volume; n.play().catch(()=>{}); }
+
+// --- Web Audio BGM (looping) ---
+let actx=null, bgBuf=null, bgNode=null, bgGain=null;
+async function ensureBgmReady(){
+  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  if(actx.state==='suspended') await actx.resume();
+  if(!bgBuf){
+    const res = await fetch('assets/sfx/bgm.mp3');
+    const arr = await res.arrayBuffer();
+    bgBuf = await actx.decodeAudioData(arr);
+  }
+}
+function startBg(vol=0.28){
+  if(!actx || !bgBuf) return;
+  if(bgNode){ try{ bgNode.stop(); }catch{}; bgNode.disconnect(); bgNode=null; }
+  if(bgGain){ bgGain.disconnect(); bgGain=null; }
+  bgNode = actx.createBufferSource();
+  bgNode.buffer = bgBuf;
+  bgNode.loop = true;
+  bgGain = actx.createGain();
+  bgGain.gain.value = vol;
+  bgNode.connect(bgGain).connect(actx.destination);
+  bgNode.start(0);
+}
+function stopBg(){ if(bgNode){ try{ bgNode.stop(); }catch{}; bgNode.disconnect(); bgNode=null; } if(bgGain){ bgGain.disconnect(); bgGain=null; } }
+function setBgMuted(on){ if(bgGain) bgGain.gain.value = on?0:0.28; }
+
+window.addEventListener('touchstart', ()=>ensureBgmReady(), {once:true});
+window.addEventListener('mousedown', ()=>ensureBgmReady(), {once:true});
+
+// --- Image loader ---
+function loadImage(src){ return new Promise((res,rej)=>{ const i=new Image(); i.src=src; i.onload=()=>res(i); i.onerror=()=>rej(src); }); }
+function drawCover(img, dx, dy, dW, dH){
+  const sAR=img.width/img.height, dAR=dW/dH; let sx,sy,sW,sH;
+  if(sAR>dAR){ sH=img.height; sW=dAR*sH; sx=(img.width-sW)/2; sy=0;}
+  else { sW=img.width; sH=sW/dAR; sx=0; sy=(img.height-sH)/2;}
+  ctx.drawImage(img,sx,sy,sW,sH,dx,dy,dW,dH);
+}
+function circleRectCollide(cx,cy,r,rx,ry,rw,rh){
+  const pad=2; rx+=pad; ry+=pad; rw-=2*pad; rh-=2*pad;
+  const nx=Math.max(rx,Math.min(cx,rx+rw));
+  const ny=Math.max(ry,Math.min(cy,ry+rh));
+  const dx=cx-nx, dy=cy-ny;
+  return (dx*dx+dy*dy)<=r*r;
+}
+function spawnObstacle(){ const minTop=80,maxTop=H-160-GAP; const topH=Math.random()*(maxTop-minTop)+minTop; obstacles.push({x:W+40,topH:topH,passed:false}); }
+
+// --- Flap / input ---
+async function flap(){
+  const now = performance.now();
+
+  // Start game
+  if(!running && !over){
+    running = true; over = false;
+    obstacles=[]; score=0; player.y=H/2; player.vy=0;
+    scoreEl.textContent = score;
+    go.style.display='none';
+    msgEl.style.display='none';
+    if(!muted){ await ensureBgmReady(); startBg(); }
+    return;
+  }
+
+  // Game Over -> double tap
+  if(over){
+    if(!restartArmed){ restartArmed=true; lastTapTime=now; msgEl.style.display='block'; msgEl.innerHTML='Tap again to restart'; return; }
+    if(now-lastTapTime<=DOUBLE_TAP_MS){
+      restartArmed=false; over=false; running=false;
+      obstacles=[]; player.y=H/2; player.vy=0; score=0; scoreEl.textContent=score;
+      msgEl.style.display='block'; msgEl.innerHTML='Tap to start';
+      go.style.display='none';
+      return;
+    } else { lastTapTime=now; msgEl.innerHTML='Tap again to restart'; return; }
+  }
+
+  // Gameplay flap
+  if(running && !over){ player.vy=FLAP_V; if(!muted) playSfx(flapSfx); }
+}
+
+window.addEventListener('keydown', e=>{if(e.code==='Space') flap();});
+window.addEventListener('mousedown', e=>{flap();});
+window.addEventListener('touchstart', e=>{e.preventDefault(); flap();},{passive:false});
+muteBtn.onclick = ()=>{
+  muted = !muted;
+  muteBtn.textContent = muted?'Unmute':'Mute';
+  if(muted){ setBgMuted(true); }
+  else if(running && !over){ ensureBgmReady().then(()=>startBg()); }
+};
+
+// --- Die / Game Over ---
+function die(){
+  over=true; running=false; restartArmed=false;
+  msgEl.style.display='block';
+  msgEl.innerHTML=`Game Over<br>Score: ${score}<br>Double tap to restart`;
+  finalScoreEl.textContent = score;
+  go.style.display='flex';
+  stopBg();
+  if(!muted) playSfx(loseSfx);
+}
+
+// --- Update ---
+function update(dt){
+  if(running && !over){
+    player.vy += GRAVITY*dt; player.y += player.vy*dt;
+    if(player.y+player.h/2>=H-6){ player.y=H-6-player.h/2; die(); }
+    if(player.y-player.h/2<=6){ player.y=6+player.h/2; player.vy=0; }
+    obstacleTimer+=dt*1000;
+    if(obstacleTimer>=OBST_INTERVAL){ spawnObstacle(); obstacleTimer=0; }
+    for(let o of obstacles){ o.x-=OBST_SPEED*dt; if(!o.passed && o.x+OBST_W<player.x-10){ o.passed=true; score++; scoreEl.textContent=score; } }
+    const cx=player.x, cy=player.y-18, r=player.w*0.40;
+    for(const o of obstacles){
+      if(circleRectCollide(cx,cy,r,o.x,0,OBST_W,o.topH) || circleRectCollide(cx,cy,r,o.x,o.topH+GAP,OBST_W,H-(o.topH+GAP))){ die(); break; }
+    }
+    obstacles = obstacles.filter(o=>o.x>-OBST_W-50);
+  }
+}
+
+// --- Draw ---
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  if(bgImg){ const pattern=ctx.createPattern(bgImg,'repeat-x'); ctx.fillStyle=pattern; ctx.fillRect(0,0,W,H); }
+  else { const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#87CEEB'); g.addColorStop(1,'#f1c27d'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+  ctx.fillStyle='#b33'; ctx.fillRect(0,H-70,W,70);
+
+  for(let o of obstacles){
+    const topH=Math.round(o.topH), bottomY=topH+GAP, bottomH=H-bottomY-70;
+    if(gfImg){ drawCover(gfImg,Math.round(o.x),0,OBST_W,topH); drawCover(gfImg,Math.round(o.x),bottomY,OBST_W,bottomH);}
+    else { ctx.fillStyle='#8b3'; ctx.fillRect(Math.round(o.x),0,OBST_W,topH); ctx.fillRect(Math.round(o.x),bottomY,OBST_W,bottomH);}
+  }
+
+  if(player.faceImg){ const size=player.w*0.9;
+    ctx.save(); ctx.translate(player.x,player.y-18); ctx.beginPath(); ctx.arc(0,0,size/2,0,Math.PI*2); ctx.closePath(); ctx.clip();
+    ctx.drawImage(player.faceImg,-size/2,-size/2,size,size); ctx.restore();
+  } else {
+    ctx.save(); ctx.translate(player.x,player.y-18); ctx.fillStyle='#ffd27f'; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#333'; ctx.font='18px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('RKS',0,0); ctx.restore();
+  }
+}
+
+// --- Loop ---
+let lastT=0;
+function loop(t){ const dt=Math.min(0.033,(t-lastT)/1000); lastT=t; update(dt); draw(); requestAnimationFrame(loop); }
+
+// --- Load assets ---
+(async function(){
+  try{ player.faceImg = await loadImage('assets/rks_face.png'); } catch(e){ player.faceImg=null; }
+  try{ gfImg = await loadImage('assets/gf_full.png'); } catch(e){ gfImg=null; }
+  try{ bgImg = await loadImage('assets/bg.png'); } catch(e){ bgImg=null; }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
