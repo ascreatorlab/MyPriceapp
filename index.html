@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India Price Index | Sir Aditya</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <div class="location">
+            <span class="material-icons" style="font-size: 18px; margin-right: 5px;">place</span>
+            <span id="loc-text">Bettiah, Bihar</span>
+            <span id="update-loc">Update</span>
+        </div>
+        <div class="search-box">
+            <span class="material-icons" style="color: #64748b; margin-right: 8px;">search</span>
+            <input type="text" id="searchInput" placeholder="Search Mandi or Items...">
+        </div>
+    </header>
+
+    <div id="mapContainer"></div>
+
+    <div class="categories" id="categoryBar">
+        <div class="chip active">All Items</div>
+        <div class="chip">Vegetables</div>
+        <div class="chip">Grains</div>
+        <div class="chip">Gold/Silver</div>
+    </div>
+
+    <div class="items-grid" id="itemsGrid">
+        </div>
+
+    <div class="ai-btn" id="aiTrigger">
+        <span class="material-icons">smart_toy</span>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active"><span class="material-icons">home</span></div>
+        <div class="nav-item"><span class="material-icons">trending_up</span></div>
+        <div class="nav-item"><span class="material-icons">explore</span></div>
+        <div class="nav-item"><span class="material-icons">person</span></div>
+    </nav>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
