@@ -1,13 +1,18 @@
 // ===== 1. Sheety API URL =====
-const API_URL = "https://api.sheety.co/e6ca57df3adfe2f877322d0ded669751/marketPricesTemplate/marketPricesTemplate";
+
+const API_URL =
+"https://api.sheety.co/e6ca57df3adfe2f877322d0ded669751/marketPricesTemplate/marketPricesTemplate";
 
 let marketData = [];
 
 
+
 // ===== 2. Render Cards =====
+
 function renderItems(data){
 
 const grid = document.getElementById("itemsGrid");
+
 grid.innerHTML = "";
 
 if(!data || data.length === 0){
@@ -46,6 +51,7 @@ ${item.trend || "Stable"}
 
 
 // ===== Update Live Time =====
+
 const now = new Date();
 
 document.getElementById("last-update-time").innerText =
@@ -56,11 +62,13 @@ now.toLocaleTimeString();
 
 
 // ===== 3. Fetch Google Sheet Data =====
+
 async function fetchLivePrices(){
 
 try{
 
 const response = await fetch(API_URL);
+
 const json = await response.json();
 
 marketData = json.marketPricesTemplate;
@@ -83,13 +91,18 @@ document.getElementById("itemsGrid").innerHTML =
 
 
 // ===== 4. Page Setup =====
+
 document.addEventListener("DOMContentLoaded",()=>{
 
+
 // Load Data
+
 fetchLivePrices();
 
 
+
 // ===== Map Setup =====
+
 const map = L.map("mapContainer").setView([26.7914,84.5042],13);
 
 L.tileLayer(
@@ -103,12 +116,15 @@ L.marker([26.7914,84.5042])
 
 
 // Fix map render bug
+
 setTimeout(()=>{
 map.invalidateSize();
 },500);
 
 
+
 // ===== Search Function =====
+
 document.getElementById("searchInput")
 .addEventListener("input",(e)=>{
 
@@ -124,7 +140,9 @@ renderItems(filtered);
 });
 
 
+
 // ===== Category Filter =====
+
 document.getElementById("categoryBar")
 .onclick = (e)=>{
 
@@ -148,10 +166,77 @@ renderItems(filtered);
 
 };
 
+
+
+// ===== AI MODAL =====
+
+const modal = document.getElementById("aiModal");
+
+const aiBtn = document.getElementById("aiTrigger");
+
+const closeBtn = document.querySelector(".close-modal");
+
+
+aiBtn.onclick = ()=>{
+
+modal.style.display = "block";
+
+};
+
+
+closeBtn.onclick = ()=>{
+
+modal.style.display = "none";
+
+};
+
+
+
+// ===== AI CHAT =====
+
+document.getElementById("sendQuery").onclick = ()=>{
+
+const input = document.getElementById("aiQuery");
+
+const chatBody = document.getElementById("chatBody");
+
+if(input.value.trim() === "") return;
+
+
+// user message
+
+chatBody.innerHTML +=
+`<p class="user-msg">${input.value}</p>`;
+
+const question = input.value;
+
+input.value = "";
+
+
+// fake AI response
+
+setTimeout(()=>{
+
+chatBody.innerHTML +=
+`<p class="ai-msg">
+Sir Aditya, Bettiah mandi data ke hisaab se
+"${question}" ka analysis chal raha hai.
+Thodi der me prediction milega.
+</p>`;
+
+chatBody.scrollTop = chatBody.scrollHeight;
+
+},800);
+
+};
+
+
 });
 
 
+
 // ===== 5. Auto Refresh (30 sec) =====
+
 setInterval(()=>{
 
 fetchLivePrices();
