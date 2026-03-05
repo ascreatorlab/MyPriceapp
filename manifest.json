@@ -1,14 +1,26 @@
 {
+  "id": "india-price-index",
   "name": "India Price Index",
   "short_name": "PriceIndex",
   "description": "Real-time mandi prices across India with live map and updates.",
+
   "start_url": "/",
   "scope": "/",
+
   "display": "standalone",
   "orientation": "portrait",
+
   "background_color": "#f5f7fa",
   "theme_color": "#2ecc71",
+
   "lang": "hi",
+
+  "categories": [
+    "business",
+    "finance",
+    "utilities"
+  ],
+
   "icons": [
     {
       "src": "assets/icon.png",
