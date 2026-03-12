@@ -34,8 +34,9 @@
       <span id="update-loc">Update</span>
     </div>
     
-    <div class="search-box">
-      <span class="material-icons">search</span>
+    <!-- ✅ Search Box with dynamic ID -->
+    <div class="search-box" id="searchBox">
+      <span class="material-icons" id="searchIcon">search</span>
       <input type="text" id="searchInput" placeholder="Search mandi items...">
     </div>
   </header>
@@ -46,8 +47,8 @@
     <div class="banner">
       <h2>🥦 Know Market</h2>
       <p>Check real mandi prices near you</p>
-    </div>
-        <div class="category-icons">
+    </div>    
+    <div class="category-icons">
       <div class="cat" data-category="Vegetables">
         <span class="material-icons">eco</span>
         <p>Vegetables</p>
@@ -74,11 +75,33 @@
     
   </div>
 
-  <!-- ========== 🗺️ EXPLORE PAGE ========== -->
+  <!-- ========== 🗺️ EXPLORE PAGE (ZOMATO STYLE) ========== -->
   <div id="explorePage" class="page">
-    <h2 class="page-title">Nearby Markets</h2>
-    <div id="mapContainer"></div>
-    <p class="map-tip">💡 Tap on markers to see mandi details</p>
+    
+    <!-- Clean Header -->
+    <div class="zomato-header">
+      <div class="back-btn" onclick="document.querySelector('[data-page=home]').click()">
+        <span class="material-icons">arrow_back</span>
+      </div>
+      <h2>Select delivery location</h2>
+    </div>
+    
+    <!-- Single Search Bar -->
+    <div class="zomato-search">
+      <span class="material-icons">search</span>
+      <input type="text" id="locationSearchInput" placeholder="Search for area, street name...">
+    </div>
+    
+    <!-- Map Container -->
+    <div class="zomato-map">
+      <div id="mapContainer"></div>
+      
+      <!-- Current Location Button -->      <button class="use-current-location" onclick="getCurrentLocation()">
+        <span class="material-icons">my_location</span>
+        <span>Use current location</span>
+      </button>
+    </div>
+    
   </div>
 
   <!-- ========== 🏪 SHOPS PAGE ========== -->
@@ -87,7 +110,6 @@
     <p class="coming-soon">
       Shops feature coming soon. 
       <br><br>
-      <!-- ✅ FIXED: href="javascript:void(0)" to prevent reload -->
       <a href="javascript:void(0)" id="registerShopLink">Register your shop</a>
     </p>
   </div>
@@ -96,11 +118,11 @@
   <div id="profilePage" class="page">
     <h2 class="page-title">Your Profile</h2>
     <div class="profile-content">
-      <button id="googleLoginBtn" class="login-btn">        <span class="material-icons">login</span>
+      <button id="googleLoginBtn" class="login-btn">
+        <span class="material-icons">login</span>
         Login with Google
       </button>
       <p id="userName" class="user-name"></p>
-      <!-- ✅ .hidden class will be defined in style.css -->
       <div id="profileDetails" class="profile-details hidden">
         <p><strong>Email:</strong> <span id="userEmail"></span></p>
         <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -123,8 +145,7 @@
       <p>AI</p>
     </div>
     <div class="nav-item" data-page="explore">
-      <span class="material-icons">explore</span>
-      <p>Explore</p>
+      <span class="material-icons">explore</span>      <p>Explore</p>
     </div>
     <div class="nav-item" data-page="profile">
       <span class="material-icons">person</span>
@@ -141,11 +162,11 @@
           <span class="material-icons">smart_toy</span>
           Know Market AI
         </h3>
-        <!-- ✅ Added ID for JS selector -->
         <span class="close-modal" id="closeAiModal">×</span>
       </div>
       
-      <div id="chatBody" class="chat-body">        <p class="ai-msg">
+      <div id="chatBody" class="chat-body">
+        <p class="ai-msg">
           Namaste Sir Aditya 👋<br><br>
           Main aapki madad kar sakta hoon:<br>
           • 🍅 Aaj ka tamatar rate?<br>
@@ -155,7 +176,6 @@
       </div>
       
       <div class="chat-input-area">
-        <!-- ✅ REMOVED inline onkeypress → Will handle in script.js -->
         <input type="text" id="aiQuery" placeholder="Ask about mandi prices...">
         <button id="sendQuery">
           <span class="material-icons">send</span>
@@ -166,12 +186,14 @@
   </div>
 
   <!-- ========== 🔗 EXTERNAL SCRIPTS ========== -->
+  
+  <!-- ✅ Single Leaflet script (no duplicate) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script type="module" src="firebase-config.js"></script>
-
-<script defer src="script.js"></script>
-
+  
+  <!-- Firebase Config (ES Module) -->
+  <script type="module" src="firebase-config.js"></script>
+  
+  <!-- Main App Logic (defer ensures DOM is ready) -->
+  <script defer src="script.js"></script>
 </body>
 </html>
