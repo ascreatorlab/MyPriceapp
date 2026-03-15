@@ -1579,14 +1579,13 @@ function hideSplash() {
   const splash = document.getElementById("splashScreen");
   if (!splash) return;
 
-  // Check if this is a refresh (not first load)
   const isRefresh = sessionStorage.getItem("zenvi_launched");
 
   if (isRefresh) {
-    // Refresh — remove splash immediately, no animation
+    // Refresh — splash turant remove
     splash.remove();
   } else {
-    // First launch — show full splash
+    // First launch — 2 second animation
     sessionStorage.setItem("zenvi_launched", "1");
     setTimeout(() => {
       splash.classList.add("hide");
@@ -1630,7 +1629,7 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Zenvi starting...");
 
-  // Clear old bad location data
+  // Clear bad location data
   const badNames = ["Bettiah, Bettiah", "Bettiah,Bettiah", "Bettiah"];
   const savedName = localStorage.getItem("zenvi_location_name");
   if (savedName && badNames.includes(savedName.trim())) {
@@ -1639,19 +1638,17 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem("zenvi_location_addr");
   }
 
-  // Check if refresh or first load
   const isRefresh = sessionStorage.getItem("zenvi_launched");
   const lastPage = restoreAppState();
 
   if (isRefresh) {
-    // REFRESH — instant, no splash, restore page
-    console.log("🔄 Refresh detected — restoring page:", lastPage);
-    hideSplash(); // removes splash instantly
+    // Refresh — splash instant remove, last page restore
+    hideSplash();
     restoreSavedLocation();
     showPage(lastPage);
     fetchLivePrices();
   } else {
-    // FIRST LAUNCH — show splash
+    // First launch — splash dikhao, home page
     hideSplash();
     restoreSavedLocation();
     showPage("home");
@@ -1660,7 +1657,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setupSearch();
   setupEvents();
-  console.log("✅ Zenvi ready!");
+  console.log("✅ Zenvi ready! Page:", lastPage);
 });
 
 // ===== AUTO REFRESH (5 min) =====
