@@ -731,12 +731,11 @@ window.initializeMapplsMap = function() {
       zoom: 14, zoomControl: true, attributionControl: false
     });
 
-    // Set currentLocation immediately from map center
-    currentLocation = {
-      lat: startLat, lng: startLng,
-      name: currentLocation?.name || "",
-      fullAddr: currentLocation?.fullAddr || ""
-    };
+    // Only set currentLocation if user has already set one
+    // Don't overwrite with default coordinates
+    if (!currentLocation?.name || currentLocation.name.match(/\d+\.\d+/)) {
+      currentLocation = { lat: startLat, lng: startLng, name: "", fullAddr: "" };
+    }
 
     setupSwiggyCenterPin();
     forceEnableConfirm();
@@ -1262,7 +1261,10 @@ function restoreSavedLocation() {
     currentLocation = JSON.parse(saved);
     const addr = localStorage.getItem("zenvi_location_addr") || "";
     const homeAddr = document.getElementById("homeAddress");
-    if (homeAddr) homeAddr.innerText = savedName + (addr ? `, ${addr.split(",")[0]}` : "");
+    // Never show coordinates in header
+    if (homeAddr && savedName && !savedName.match(/\d+\.\d+/)) {
+      homeAddr.innerText = savedName + (addr ? `, ${addr.split(",")[0]}` : "");
+    }
 
     const locSection = document.getElementById("locationSection");
     if (locSection) locSection.classList.add("location-set");
@@ -1635,8 +1637,7 @@ function setupProfileSettings() {
   document.getElementById("editProfileBtn")?.addEventListener("click", () => {
     const user = window.zenviAuth?.auth?.currentUser;
     if (!user) { showToast("⚠️ Pehle login karein"); return; }
-    const newName = prompt("Display name change karein:", user.displayName || "");
-    if (newName && newName.trim()) showToast(`✅ Name update: ${newName.trim()} (Google account se connected)`);
+    openEditProfileModal(user);
   });
 
   // ===== Quick Row =====
@@ -1944,3 +1945,129 @@ function renderShopsList(shops) {
 }
 
 // loadShopsList on shops page open is handled in showPage directly
+
+// ===== EDIT PROFILE MODAL (Swiggy style) =====
+function openEditProfileModal(user) {
+  let modal = document.getElementById("editProfileModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "editProfileModal";
+    document.body.appendChild(modal);
+  }
+
+  modal.style.cssText = "position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;";
+
+  modal.innerHTML = `
+    <div style="background:white;width:100%;border-radius:24px 24px 0 0;padding:0 0 40px;max-height:92vh;overflow-y:auto;">
+      
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #f1f5f9;position:sticky;top:0;background:white;z-index:1;">
+        <button onclick="document.getElementById('editProfileModal').style.display='none';" 
+          style="background:none;border:none;cursor:pointer;padding:4px;">
+          <span class="material-icons-round" style="font-size:22px;">arrow_back</span>
+        </button>
+        <h3 style="font-size:17px;font-weight:800;flex:1;">Your Profile</h3>
+        <button id="saveProfileBtn" onclick="saveProfileChanges()"
+          style="background:#16a34a;color:white;border:none;border-radius:20px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+          Save
+        </button>
+      </div>
+
+      <!-- Avatar -->
+      <div style="text-align:center;padding:24px 20px 16px;">
+        <div style="width:80px;height:80px;border-radius:50%;background:#e0e7ff;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+          ${user.photoURL 
+            ? `<img src="${user.photoURL}" style="width:100%;height:100%;object-fit:cover;">` 
+            : `<span style="font-size:36px;font-weight:800;color:#6366f1;">${(user.displayName||"U")[0].toUpperCase()}</span>`}
+        </div>
+      </div>
+
+      <!-- Fields -->
+      <div style="padding:0 20px;">
+        
+        <!-- Name -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:4px;">Name</label>
+          <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;align-items:center;">
+            <input id="editName" value="${user.displayName || ''}" 
+              style="flex:1;border:none;outline:none;font-size:15px;font-weight:600;font-family:inherit;color:#1e293b;"
+              placeholder="Aapka naam">
+            <button onclick="document.getElementById('editName').value=''"
+              style="background:#f1f5f9;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+              <span class="material-icons-round" style="font-size:14px;color:#94a3b8;">close</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Phone -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:4px;">Mobile</label>
+          <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;align-items:center;">
+            <input id="editPhone" type="tel" 
+              value="${localStorage.getItem('zenvi_phone') || ''}"
+              style="flex:1;border:none;outline:none;font-size:15px;font-weight:600;font-family:inherit;color:#1e293b;"
+              placeholder="+91 XXXXXXXXXX" maxlength="13">
+            <span style="font-size:12px;font-weight:700;color:#16a34a;cursor:pointer;" 
+              onclick="showToast('📱 Phone number update hoga')">CHANGE</span>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:4px;">Email</label>
+          <div style="border:1.5px solid #f1f5f9;border-radius:12px;padding:14px;display:flex;align-items:center;background:#f8fafc;">
+            <input value="${user.email || ''}" readonly
+              style="flex:1;border:none;outline:none;font-size:15px;font-weight:600;font-family:inherit;color:#94a3b8;background:transparent;">
+            <span style="font-size:12px;font-weight:700;color:#16a34a;cursor:pointer;"
+              onclick="showToast('📧 Email Google account se linked hai')">CHANGE</span>
+          </div>
+        </div>
+
+        <!-- Gender -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:4px;">Gender</label>
+          <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;">
+            <select id="editGender" style="width:100%;border:none;outline:none;font-size:15px;font-weight:600;font-family:inherit;color:#1e293b;background:transparent;">
+              <option value="">Select Gender</option>
+              <option value="male" ${localStorage.getItem('zenvi_gender')==='male'?'selected':''}>Male</option>
+              <option value="female" ${localStorage.getItem('zenvi_gender')==='female'?'selected':''}>Female</option>
+              <option value="other" ${localStorage.getItem('zenvi_gender')==='other'?'selected':''}>Other</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Update Button -->
+      <div style="padding:0 20px;">
+        <button onclick="saveProfileChanges()"
+          style="width:100%;padding:16px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;"
+          id="updateProfileBtn">
+          Update profile
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  modal.style.display = "flex";
+  modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; };
+}
+
+window.saveProfileChanges = function() {
+  const name   = document.getElementById("editName")?.value.trim();
+  const phone  = document.getElementById("editPhone")?.value.trim();
+  const gender = document.getElementById("editGender")?.value;
+
+  if (phone) localStorage.setItem("zenvi_phone", phone);
+  if (gender) localStorage.setItem("zenvi_gender", gender);
+
+  // Update displayed name
+  if (name) {
+    const nameEl = document.getElementById("profileDisplayName");
+    if (nameEl) nameEl.textContent = name;
+  }
+
+  document.getElementById("editProfileModal").style.display = "none";
+  showToast("✅ Profile updated!");
+};
