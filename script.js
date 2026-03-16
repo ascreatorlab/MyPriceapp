@@ -851,7 +851,7 @@ function setupSwiggyCenterPin() {
 
       // Get proper name via reverse geocode
       clearTimeout(reverseGeocodeTimer);
-      reverseGeocodeTimer = setTimeout(() => reverseGeocode(lat, lng), 800);
+      reverseGeocodeTimer = setTimeout(() => reverseGeocode(lat, lng), 400);
 
     } catch(e) { console.error("moveend error:", e); }
   });
@@ -1234,58 +1234,78 @@ function confirmLocation(name) {
 }
 
 function confirmAndProceed() {
-  // ❌ Don't save if truly no location
   if (!currentLocation?.lat || !currentLocation?.lng) {
     showToast("⚠️ Pehle map pe location select karein!");
     return;
   }
 
-  const place = currentLocation.name || "";
-  const fullAddr = currentLocation?.fullAddr || "";
+  // Get best available name
+  const nameEl = document.getElementById("selectedLocationName");
+  const addrEl = document.getElementById("selectedLocationAddress");
+  const displayName = nameEl?.textContent || "";
+  const displayAddr = addrEl?.textContent || "";
 
-  // ❌ Don't save coordinate strings as location name
-  if (isCoordinateString(place)) {
-    // Try to get name first, then confirm
-    const nameEl = document.getElementById("selectedLocationName");
-    const displayedName = nameEl?.textContent || "";
-    if (isCoordinateString(displayedName) || displayedName === "📍 Dhundh raha hai...") {
-      showToast("⏳ Location naam aa raha hai... dobara try karein");
-      return;
-    }
-    currentLocation.name = displayedName;
-    currentLocation.fullAddr = document.getElementById("selectedLocationAddress")?.textContent || "";
-  }
+  // Use displayed name if it's real (not loading/coordinate)
+  const isValidName = (n) => n && n.length > 2 &&
+    !isCoordinateString(n) &&
+    n !== "📍 Dhundh raha hai..." &&
+    n !== "Map pe location chunein..." &&
+    n !== "Location selected ✓" &&
+    n !== "Nearby Area";
 
-  const finalPlace = currentLocation.name;
+  let finalPlace = "";
+  let finalAddr = "";
 
-  // Strong validation — block coordinates
-  if (!finalPlace || isCoordinateString(finalPlace)) {
-    showToast("⏳ Location naam aa raha hai... thoda wait karein");
+  if (isValidName(displayName)) {
+    finalPlace = displayName;
+    finalAddr = displayAddr;
+    currentLocation.name = finalPlace;
+    currentLocation.fullAddr = finalAddr;
+  } else if (isValidName(currentLocation.name)) {
+    finalPlace = currentLocation.name;
+    finalAddr = currentLocation.fullAddr || "";
+  } else {
+    // Still loading — wait and auto retry
+    const btn = document.getElementById("confirmBtn");
+    if (btn) { btn.innerHTML = "⏳ Naam aa raha hai..."; btn.disabled = true; }
+    showToast("⏳ Location naam aa raha hai... ruko");
+    let tries = 0;
+    const wait = setInterval(() => {
+      tries++;
+      const n = document.getElementById("selectedLocationName")?.textContent || "";
+      if (isValidName(n)) {
+        clearInterval(wait);
+        if (btn) { btn.innerHTML = "📍 Confirm Location"; btn.disabled = false; }
+        confirmAndProceed();
+      } else if (tries >= 12) {
+        clearInterval(wait);
+        if (btn) { btn.innerHTML = "📍 Confirm Location"; btn.disabled = false; }
+        // Use "Nearby Area" as last resort
+        currentLocation.name = "Nearby Area";
+        currentLocation.fullAddr = "";
+        confirmAndProceed();
+      }
+    }, 500);
     return;
   }
-  const finalAddr = currentLocation.fullAddr || "";
 
-  // 🔐 Login check — bina login ke bhi allow karo (localStorage mein save)
-  const isLoggedIn = window.zenviAuth?.auth?.currentUser;
-  if (!isLoggedIn) {
-    // Still save locally but show login nudge
-    if (!isCoordinateString(finalPlace)) showToast(`📍 ${finalPlace} saved!`); else showToast("📍 Location saved! Login karein cloud sync ke liye 🔐");
-  } else {
-    if (!isCoordinateString(finalPlace)) showToast(`📍 ${finalPlace} saved! ☁️`);
-    // Save to Firebase cloud
-    if (window.saveLocationToCloud) window.saveLocationToCloud(currentLocation);
-  }
-
-  // ✅ Always save to localStorage
+  // Save to localStorage
   localStorage.setItem("zenvi_location", JSON.stringify(currentLocation));
   localStorage.setItem("zenvi_location_name", finalPlace);
   localStorage.setItem("zenvi_location_addr", finalAddr);
 
-  // Update home header — never show coordinates
-  const homeAddr = document.getElementById("homeAddress");
-  if (homeAddr && finalPlace && !isCoordinateString(finalPlace)) {
-    homeAddr.innerText = finalPlace + (finalAddr ? `, ${finalAddr.split(",")[0]}` : "");
+  // Update Firebase if logged in
+  const isLoggedIn = window.zenviAuth?.auth?.currentUser;
+  if (isLoggedIn && window.saveLocationToCloud) {
+    window.saveLocationToCloud(currentLocation);
+    showToast(`📍 ${finalPlace} saved! ☁️`);
+  } else {
+    showToast(`📍 ${finalPlace} saved!`);
   }
+
+  // Update header
+  const homeAddr = document.getElementById("homeAddress");
+  if (homeAddr) homeAddr.innerText = finalPlace + (finalAddr ? `, ${finalAddr.split(",")[0]}` : "");
 
   showPage("home");
 }
@@ -1786,9 +1806,7 @@ function setupProfileSettings() {
   document.querySelectorAll(".zp-menu-row").forEach(row => {
     const text = row.querySelector(".zp-row-text p")?.textContent;
     if (text === "About Zenvi") {
-      row.addEventListener("click", () => {
-        alert("🌿 Zenvi — Smart Mandi App\n\nIndia ke kisan aur grahak ke liye live mandi prices.\n\nVersion: 1.0\nDeveloper: Aditya Soni\nMade with ❤️ in India 🇮🇳");
-      });
+      row.addEventListener("click", () => openAboutModal());
     }
     if (text === "Help & Support") {
       row.addEventListener("click", () => {
@@ -2210,3 +2228,84 @@ window.saveProfileChanges = function() {
   document.getElementById("editProfileModal").style.display = "none";
   showToast("✅ Profile updated!");
 };
+
+// ===== ABOUT ZENVI MODAL =====
+function openAboutModal() {
+  let modal = document.getElementById("aboutModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "aboutModal";
+    document.body.appendChild(modal);
+  }
+
+  modal.style.cssText = "position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;";
+
+  modal.innerHTML = `
+    <div style="background:white;width:100%;border-radius:24px;overflow:hidden;max-width:400px;">
+      
+      <!-- Green header -->
+      <div style="background:linear-gradient(135deg,#15803d,#16a34a);padding:32px 24px;text-align:center;">
+        <div style="font-size:56px;margin-bottom:12px;">🌿</div>
+        <h2 style="color:white;font-size:28px;font-weight:800;margin:0 0 4px;">Zenvi</h2>
+        <p style="color:rgba(255,255,255,0.85);font-size:14px;margin:0;">Smart Mandi App</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding:24px;">
+        <p style="font-size:14px;color:#475569;line-height:1.7;margin-bottom:20px;">
+          India ke kisan aur grahak ke liye <strong>live mandi prices</strong>, AI assistant, aur nearby shops — sab ek jagah.
+        </p>
+
+        <!-- Stats -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
+          <div style="background:#f0fdf4;border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:800;color:#16a34a;margin:0;">100+</p>
+            <p style="font-size:11px;color:#64748b;margin:0;">Items</p>
+          </div>
+          <div style="background:#f0fdf4;border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:800;color:#16a34a;margin:0;">Free</p>
+            <p style="font-size:11px;color:#64748b;margin:0;">Always</p>
+          </div>
+          <div style="background:#f0fdf4;border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:800;color:#16a34a;margin:0;">AI</p>
+            <p style="font-size:11px;color:#64748b;margin:0;">Powered</p>
+          </div>
+        </div>
+
+        <!-- Features -->
+        <div style="margin-bottom:20px;">
+          ${[
+            ["📊","Live Mandi Prices","data.gov.in se real-time data"],
+            ["🤖","AI Assistant","Gemini powered mandi guide"],
+            ["🗺️","Map Location","Mappls India map integration"],
+            ["👥","Community Data","User suggested prices"],
+            ["🏪","Shop Register","Local dukaan listing"]
+          ].map(([icon,title,sub]) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:20px;">${icon}</span>
+              <div>
+                <p style="font-size:13px;font-weight:700;color:#1e293b;margin:0;">${title}</p>
+                <p style="font-size:11px;color:#94a3b8;margin:0;">${sub}</p>
+              </div>
+            </div>`).join('')}
+        </div>
+
+        <!-- Developer info -->
+        <div style="background:#f8fafc;border-radius:12px;padding:14px;margin-bottom:16px;text-align:center;">
+          <p style="font-size:13px;color:#64748b;margin:0 0 4px;">Developer</p>
+          <p style="font-size:15px;font-weight:800;color:#1e293b;margin:0;">Aditya Soni</p>
+          <p style="font-size:12px;color:#94a3b8;margin:4px 0 0;">Version 1.0 • Made with ❤️ in India 🇮🇳</p>
+        </div>
+
+        <button onclick="document.getElementById('aboutModal').style.display='none';"
+          style="width:100%;padding:14px;background:#16a34a;color:white;border:none;
+          border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">
+          Close
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+  modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; };
+}
