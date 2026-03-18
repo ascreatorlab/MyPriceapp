@@ -1221,3 +1221,14 @@ body.dark-mode .shop-register-banner { background: linear-gradient(135deg, #1665
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 body.dark-mode .shop-card-new { background: #1e293b; border-color: #334155; }
+
+/* ===== CONFIRM BUTTON - ALWAYS ENABLED ===== */
+.confirm-btn,
+.confirm-btn:disabled,
+.confirm-btn[disabled] {
+  background: var(--primary) !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  color: white !important;
+}
