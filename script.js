@@ -27,23 +27,28 @@ function isCoordinateString(str) {
 }
 
 
-// ===== PER-USER STORAGE HELPERS =====
-function getUserKey(key) {
-  const uid = window.zenviAuth?.auth?.currentUser?.uid || "guest";
-  return "zenvi_user_" + uid + "_" + key;
-}
+// ===== USER DATA HELPERS =====
+// Phone stored globally on device (user wants it persistent)
+// But never shown to OTHER users by default
 function getUserPhone() {
-  return localStorage.getItem(getUserKey("phone")) || "";
+  const uid = window.zenviAuth?.auth?.currentUser?.uid;
+  // Per-account phone, falls back to device phone if same device
+  return localStorage.getItem("zenvi_phone_" + (uid||"")) || 
+         localStorage.getItem("zenvi_phone") || "";
 }
 function setUserPhone(phone) {
-  if (phone) localStorage.setItem(getUserKey("phone"), phone);
+  if (!phone) return;
+  const uid = window.zenviAuth?.auth?.currentUser?.uid;
+  localStorage.setItem("zenvi_phone_" + (uid||""), phone);
+  // Also save globally for address forms (same device)
+  if (uid) localStorage.setItem("zenvi_phone", phone);
 }
 function getUserName() {
   const user = window.zenviAuth?.auth?.currentUser;
-  return user?.displayName || localStorage.getItem(getUserKey("name")) || "";
+  return user?.displayName || localStorage.getItem("zenvi_username") || "";
 }
 function setUserName(name) {
-  if (name) localStorage.setItem(getUserKey("name"), name);
+  if (name) localStorage.setItem("zenvi_username", name);
 }
 
 // ===== STATE =====
@@ -1606,11 +1611,14 @@ function restoreSavedLocation() {
     const saved = localStorage.getItem("zenvi_location");
     const savedName = localStorage.getItem("zenvi_location_name");
 
-    // Validate — don't restore garbage values
-    const invalidNames = ["Map pe location chunein...", "Location selected", "Selected Location", "null", "undefined", ""];
-    // Reject coordinate-format names like "26.8018, 84.5037"
-    const isCoordinate = savedName && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(savedName.trim());
-    if (!saved || !savedName || invalidNames.includes(savedName) || isCoordinate) {
+    // Validate — reject ALL garbage values
+    const INVALID = new Set(["Map pe location chunein...","Location selected",
+      "Selected Location","null","undefined","","My Location","Meri Location",
+      "Selected Area","My Area","Selecting...","Location selected ✓",
+      "📍 Dhundh raha hai...","Map drag karo ya search karein"]);
+    const isCoordinate = savedName && /^-?\d+\.\d+,?\s*-?\d+\.\d+$/.test(savedName.trim());
+    const hasDigits = savedName && /\d+\.\d+/.test(savedName);
+    if (!saved || !savedName || INVALID.has(savedName) || isCoordinate || hasDigits) {
       localStorage.removeItem("zenvi_location");
       localStorage.removeItem("zenvi_location_name");
       localStorage.removeItem("zenvi_location_addr");
@@ -1621,11 +1629,20 @@ function restoreSavedLocation() {
     const addr = localStorage.getItem("zenvi_location_addr") || "";
     const homeAddr = document.getElementById("homeAddress");
     if (homeAddr && savedName && !savedName.match(/\d+\.\d+/)) {
-      // Show full address from saved addresses (like Zomato)
       const savedAddresses = JSON.parse(localStorage.getItem("zenvi_saved_addresses") || "[]");
-      const matchAddr = savedAddresses.find(a => a.name === savedName || a.label === "Home");
-      const displayText = matchAddr?.fullAddr || (savedName + (addr ? `, ${addr.split(",")[0]}` : ""));
-      homeAddr.innerText = displayText;
+      const matchAddr = savedAddresses.find(a => a.name === savedName || a.fullAddr?.includes(savedName));
+      if (matchAddr) {
+        // Show: "Rani Pakdi, Bettiah..." like Zomato
+        homeAddr.innerText = matchAddr.floor 
+          ? matchAddr.floor + ", " + savedName 
+          : savedName + (addr && !addr.includes(savedName) ? ", " + addr.split(",")[0] : "");
+        // Update label
+        const lbl = matchAddr.label || "Home";
+        const locLabel = document.getElementById("locLabel");
+        if (locLabel) locLabel.textContent = (lbl==="Home"?"🏠":lbl==="Work"?"💼":"📍") + " " + lbl;
+      } else {
+        homeAddr.innerText = savedName + (addr && !addr.includes(savedName) ? ", " + addr.split(",")[0] : "");
+      }
     }
 
     const locSection = document.getElementById("locationSection");
@@ -2881,6 +2898,7 @@ window.viewShopDetail = function(shopJson) {
   let s;
   try { s = typeof shopJson === "string" ? JSON.parse(shopJson) : shopJson; }
   catch(e) { showToast("Error loading shop"); return; }
+  window._currentViewingShop = s.name; // Track which shop is being viewed
 
   const typeEmoji = { sabji:"🥬", phal:"🍎", kirana:"🛒", anaaj:"🌾", dairy:"🥛", mandi:"🏪", other:"✨" };
   const typeLabel = { sabji:"Sabji Bhandar", phal:"Phal Bhandar", kirana:"Kirana Store", anaaj:"Anaaj/Dal", dairy:"Dairy/Milk", mandi:"Mandi/Wholesale", other:"Other" };
@@ -3500,20 +3518,36 @@ window.saveShopItems = function(shopId) {
   if (!items) { showToast("⚠️ Koi item nahi daala!"); return; }
   
   const shops = JSON.parse(localStorage.getItem("zenvi_shops") || "[]");
-  const idx = shops.findIndex(s => s.id === shopId || s.name === shopId);
+  // Try multiple matching strategies
+  let idx = shops.findIndex(s => s.id === shopId || s.name === shopId);
+  // If not found, try current shop being viewed
+  if (idx < 0 && window._currentViewingShop) {
+    idx = shops.findIndex(s => s.name === window._currentViewingShop);
+  }
+  
   if (idx >= 0) {
     shops[idx].items = items;
     localStorage.setItem("zenvi_shops", JSON.stringify(shops));
-    window._shopsData = shops; // Update global
-    showToast("✅ Items saved!");
+    window._shopsData = shops;
+    showToast("✅ Items saved! Ab shop mein dikh rahe hain.");
     document.getElementById("addItemsShopModal").style.display = "none";
-    // Refresh shop detail view
-    setTimeout(() => {
-      window.viewShopDetail(shops[idx]);
-    }, 300);
+    setTimeout(() => window.viewShopDetail(shops[idx]), 300);
     loadShopsList();
   } else {
-    showToast("❌ Shop nahi mila — reload karein");
+    // Last resort: add to first shop owned by current user
+    const uid = window.zenviAuth?.auth?.currentUser?.uid;
+    const myShopIdx = shops.findIndex(s => s.submittedBy === uid);
+    if (myShopIdx >= 0) {
+      shops[myShopIdx].items = items;
+      localStorage.setItem("zenvi_shops", JSON.stringify(shops));
+      window._shopsData = shops;
+      showToast("✅ Items saved!");
+      document.getElementById("addItemsShopModal").style.display = "none";
+      setTimeout(() => window.viewShopDetail(shops[myShopIdx]), 300);
+      loadShopsList();
+    } else {
+      showToast("❌ Shop nahi mila. Dobara try karein.");
+    }
   }
 };
 window.viewShopByIndex = function(idx) {
