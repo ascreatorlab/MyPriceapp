@@ -370,16 +370,8 @@ window.logout = function() {
   if (!auth) return;
   if (!confirm("Logout karna chahte hain?")) return;
   signOut(auth).then(() => {
-    // Clear ALL user-specific cached data for privacy
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      // Keep non-user-specific data (prices cache, location, shops list)
-      if (key && (key.includes("zenvi_user_") || key === "zenvi_phone" || key === "zenvi_username")) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Keep phone & username on device (user wants them persistent)
+    // Only clear session
     sessionStorage.removeItem("zenvi_launched");
     resetProfileUI();
     if (window.showToast) window.showToast("👋 Logged out safely!");
