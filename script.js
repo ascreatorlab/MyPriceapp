@@ -141,7 +141,7 @@ function renderItems(data) {
 
   data.forEach((item, i) => {
     const trendIcon = item.trend === "up" ? "📈" : item.trend === "down" ? "📉" : "➡️";
-    const trendText = item.trend === "up" ? "Badh raha" : item.trend === "down" ? "Gir raha" : "Stable";
+    const trendText = item.trend === "up" ? t("badh_raha") : item.trend === "down" ? t("gir_raha") : t("stable");
     const isCommunity = item.source === "community";
     const card = document.createElement("div");
     card.className = "item-card";
@@ -1413,8 +1413,8 @@ function confirmAndProceed() {
     }, 1500);
   }
 
-  // Instead of going home directly, show address details form (Swiggy style)
-  showAddressDetailsForm(name, addr);
+  showToast("📍 " + name + " saved!");
+  showPage("home");
 }
 
 // ===== SWIGGY-STYLE ADDRESS DETAILS FORM =====
@@ -1629,20 +1629,12 @@ function restoreSavedLocation() {
     const addr = localStorage.getItem("zenvi_location_addr") || "";
     const homeAddr = document.getElementById("homeAddress");
     if (homeAddr && savedName && !savedName.match(/\d+\.\d+/)) {
+      homeAddr.innerText = savedName + (addr && !addr.includes(savedName) ? ", " + addr.split(",")[0] : "");
       const savedAddresses = JSON.parse(localStorage.getItem("zenvi_saved_addresses") || "[]");
-      const matchAddr = savedAddresses.find(a => a.name === savedName || a.fullAddr?.includes(savedName));
-      if (matchAddr) {
-        // Show: "Rani Pakdi, Bettiah..." like Zomato
-        homeAddr.innerText = matchAddr.floor 
-          ? matchAddr.floor + ", " + savedName 
-          : savedName + (addr && !addr.includes(savedName) ? ", " + addr.split(",")[0] : "");
-        // Update label
-        const lbl = matchAddr.label || "Home";
-        const locLabel = document.getElementById("locLabel");
-        if (locLabel) locLabel.textContent = (lbl==="Home"?"🏠":lbl==="Work"?"💼":"📍") + " " + lbl;
-      } else {
-        homeAddr.innerText = savedName + (addr && !addr.includes(savedName) ? ", " + addr.split(",")[0] : "");
-      }
+      const matchAddr = savedAddresses.find(a => a.name === savedName || (a.fullAddr||"").includes(savedName));
+      const lbl = matchAddr?.label || "Location";
+      const locLabel = document.getElementById("locLabel");
+      if (locLabel) locLabel.textContent = (lbl==="Home"?"🏠":lbl==="Work"?"💼":"📍") + " " + lbl;
     }
 
     const locSection = document.getElementById("locationSection");
@@ -2107,6 +2099,9 @@ function setupProfileSettings() {
   // ===== About Zenvi =====
   document.querySelectorAll(".zp-menu-row").forEach(row => {
     const text = row.querySelector(".zp-row-text p")?.textContent;
+    if (text === "Language" || text === "भाषा") {
+      row.addEventListener("click", () => window.openLanguageSelector());
+    }
     if (text === "About Zenvi") {
       row.addEventListener("click", () => openAboutModal());
     }
@@ -3125,7 +3120,8 @@ function openLocationSelector() {
 
 // Use device GPS location
 window.useCurrentLocationNow = function() {
-  document.getElementById("locationSelectorModal").style.display = "none";
+  const modal = document.getElementById("locationSelectorModal");
+  if (modal) modal.style.display = "none";
   if (!navigator.geolocation) { showToast("⚠️ GPS not supported"); return; }
   showToast("📡 GPS se location dhundh raha hai...");
   navigator.geolocation.getCurrentPosition(
@@ -3561,3 +3557,188 @@ window.editShopByIndex = function(idx) {
   if (idx < 0 || idx >= shops.length) { showToast("Shop nahi mila"); return; }
   window.editMyShop(shops[idx]);
 };
+
+// ===== MULTI-LANGUAGE SYSTEM =====
+const TRANSLATIONS = {
+  en: {
+    // Header
+    'location_tap': 'Tap to set location',
+    'search_placeholder': 'Search vegetables, grains, fruits...',
+    // Home
+    'live_mandi': 'Live Mandi Prices',
+    'aaj_ki': "Today's Fresh Prices",
+    'items': 'Items',
+    'sabse_sasta': 'Cheapest',
+    'updated': 'Updated',
+    // Categories
+    'categories': 'Categories',
+    'sab': 'All',
+    'sabji': 'Vegetables',
+    'phal': 'Fruits',
+    'anaaj': 'Grains',
+    'aur': 'More',
+    // Market
+    'market_rates': 'Market Rates',
+    'add_item': '+ Add Item',
+    'suggest': 'Suggest',
+    'badh_raha': 'Rising',
+    'gir_raha': 'Falling',
+    'stable': 'Stable',
+    // Nav
+    'home': 'Home',
+    'shops': 'Shops',
+    'explore': 'Explore',
+    'profile': 'Profile',
+    // Profile
+    'account': 'Account',
+    'saved_address': 'Saved Address',
+    'fav_items': 'Favourite Items',
+    'price_alerts': 'Price Alerts',
+    'market_watch': 'Market Watch',
+    'seller_mode': 'Seller Mode',
+    'settings': 'Settings',
+    'dark_mode': 'Dark Mode',
+    'notifications': 'Notifications',
+    'about': 'About Zenvi',
+    'help': 'Help & Support',
+    'privacy': 'Privacy Policy',
+    'logout': 'Logout',
+    // Language
+    'language': 'Language',
+  },
+  hi: {
+    'location_tap': 'Location set karein',
+    'search_placeholder': 'सब्जी, अनाज, फल खोजें...',
+    'live_mandi': 'Live Mandi Prices',
+    'aaj_ki': 'आज की ताज़ा कीमतें',
+    'items': 'Items',
+    'sabse_sasta': 'Sabse Sasta',
+    'updated': 'Updated',
+    'categories': 'Categories',
+    'sab': 'Sab',
+    'sabji': 'Sabji',
+    'phal': 'Phal',
+    'anaaj': 'Anaaj',
+    'aur': 'Aur',
+    'market_rates': 'Market Rates',
+    'add_item': '+ Item Add Karein',
+    'suggest': 'Suggest',
+    'badh_raha': 'Badh raha',
+    'gir_raha': 'Gir raha',
+    'stable': 'Stable',
+    'home': 'Home',
+    'shops': 'Shops',
+    'explore': 'Explore',
+    'profile': 'Profile',
+    'account': 'Account',
+    'saved_address': 'Saved Address',
+    'fav_items': 'Favourite Items',
+    'price_alerts': 'Price Alerts',
+    'market_watch': 'Market Watch',
+    'seller_mode': 'Seller Mode',
+    'settings': 'Settings',
+    'dark_mode': 'Dark Mode',
+    'notifications': 'Notifications',
+    'about': 'About Zenvi',
+    'help': 'Help & Support',
+    'privacy': 'Privacy Policy',
+    'logout': 'Logout',
+    'language': 'भाषा',
+  }
+};
+
+let currentLang = localStorage.getItem("zenvi_lang") || "hi";
+
+function t(key) {
+  return TRANSLATIONS[currentLang]?.[key] || TRANSLATIONS['hi'][key] || key;
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("zenvi_lang", lang);
+  applyLanguage();
+  showToast(lang === 'en' ? "✅ Language changed to English" : "✅ Hindi language set");
+}
+
+function applyLanguage() {
+  // Update search placeholder
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) searchInput.placeholder = t('search_placeholder');
+  
+  // Update hero text
+  const heroTag = document.querySelector(".hero-tag");
+  if (heroTag) heroTag.textContent = t('aaj_ki');
+  
+  // Update stat labels
+  const statLabels = document.querySelectorAll(".stat-label");
+  const labelKeys = ['items', 'sabse_sasta', 'updated'];
+  statLabels.forEach((el, i) => { if (labelKeys[i]) el.textContent = t(labelKeys[i]); });
+  
+  // Update market rates heading
+  const mrHead = document.querySelector(".section-header h3");
+  if (mrHead) mrHead.textContent = t('market_rates');
+  
+  // Update add item button
+  const addBtn = document.querySelector(".add-item-btn-text");
+  if (addBtn) addBtn.textContent = t('add_item');
+  
+  // Update nav labels
+  const navLabels = {home:'home', shops:'shops', explore:'explore', profile:'profile'};
+  document.querySelectorAll(".nav-item[data-page]").forEach(item => {
+    const p = item.querySelector("p");
+    if (p && navLabels[item.dataset.page]) p.textContent = t(navLabels[item.dataset.page]);
+  });
+  
+  // Update tap to set location
+  const homeAddr = document.getElementById("homeAddress");
+  if (homeAddr && homeAddr.textContent === "Tap to set location") {
+    homeAddr.textContent = t('location_tap');
+  }
+  
+  // Update category chips
+  document.querySelectorAll(".cat-chip").forEach(chip => {
+    const cat = chip.dataset.cat;
+    if (cat) {
+      const keyMap = {All:'sab', Vegetables:'sabji', Fruits:'phal', Grains:'anaaj', Others:'aur'};
+      if (keyMap[cat]) chip.querySelector("span:last-child")?.remove(); // avoid double
+    }
+  });
+  
+  // Re-render items to update trend labels
+  if (marketData.length > 0) renderItems(marketData);
+}
+
+window.openLanguageSelector = function() {
+  let modal = document.getElementById("langModal");
+  if (!modal) { modal = document.createElement("div"); modal.id = "langModal"; document.body.appendChild(modal); }
+  modal.style.cssText = "position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;";
+  modal.innerHTML = `
+    <div style="background:white;width:100%;border-radius:24px 24px 0 0;padding:24px 20px 40px;">
+      <div style="width:40px;height:4px;background:#e2e8f0;border-radius:99px;margin:0 auto 20px;"></div>
+      <h3 style="font-size:17px;font-weight:800;text-align:center;margin-bottom:20px;">🌐 Language / भाषा</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="setLanguage('hi');document.getElementById('langModal').style.display='none';"
+          style="padding:16px;background:${currentLang==='hi'?'#f0fdf4':'white'};border:2px solid ${currentLang==='hi'?'#16a34a':'#e2e8f0'};border-radius:14px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;">
+          <span style="font-size:28px;">🇮🇳</span>
+          <div style="text-align:left;">
+            <p style="font-size:16px;font-weight:800;color:#1e293b;margin:0;">हिंदी</p>
+            <p style="font-size:12px;color:#64748b;margin:0;">Hindi</p>
+          </div>
+          ${currentLang==='hi'?'<span style="margin-left:auto;background:#16a34a;color:white;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">✓ Active</span>':""}
+        </button>
+        <button onclick="setLanguage('en');document.getElementById('langModal').style.display='none';"
+          style="padding:16px;background:${currentLang==='en'?'#f0fdf4':'white'};border:2px solid ${currentLang==='en'?'#16a34a':'#e2e8f0'};border-radius:14px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;">
+          <span style="font-size:28px;">🇬🇧</span>
+          <div style="text-align:left;">
+            <p style="font-size:16px;font-weight:800;color:#1e293b;margin:0;">English</p>
+            <p style="font-size:12px;color:#64748b;margin:0;">English</p>
+          </div>
+          ${currentLang==='en'?'<span style="margin-left:auto;background:#16a34a;color:white;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">✓ Active</span>':""}
+        </button>
+      </div>
+    </div>
+  `;
+  modal.style.display = "flex";
+  modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; };
+};
+
