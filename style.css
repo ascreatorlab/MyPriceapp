@@ -1244,3 +1244,9 @@ body.dark-mode .shop-card-new { background: #1e293b; border-color: #334155; }
   transition: all 0.2s;
   font-weight: 700;
 }
+
+/* ===== ADDRESS FORM ANIMATION ===== */
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
