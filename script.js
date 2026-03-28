@@ -975,11 +975,20 @@ async function reverseGeocode(lat, lng) {
     if (!displayName || displayName === "Nearby Area") return false;
     if (nameEl) nameEl.textContent = displayName;
     if (addrEl) addrEl.textContent = fullAddr || "";
-    currentLocation = { lat, lng, name: displayName, fullAddr: fullAddr || "" };
+    currentLocation = { ...currentLocation, lat, lng, name: displayName, fullAddr: fullAddr || "" };
     forceEnableConfirm();
-    // Update confirm button text with location name
+    // Update confirm button with area name
     const btn = document.getElementById("confirmBtn");
-    if (btn) btn.innerHTML = `📍 Confirm — ${displayName.split(",")[0]}`;
+    const areaOnly = displayName.split(",")[0].trim();
+    if (btn) {
+      btn.innerHTML = `📍 Confirm — ${areaOnly}`;
+      btn.style.background = "var(--primary)";
+    }
+    // Update address card in loc-confirm section
+    const nameDisp = document.getElementById("selectedLocationName");
+    const addrDisp = document.getElementById("selectedLocationAddress");
+    if (nameDisp) nameDisp.textContent = displayName;
+    if (addrDisp) addrDisp.textContent = fullAddr || "";
     return true;
   }
 
@@ -1006,30 +1015,34 @@ async function reverseGeocode(lat, lng) {
       const r = data.results[0];
       console.log("🗺️ Mappls:", JSON.stringify(r));
       
-      // Extract ALL possible name fields
-      const localName = r.subSubLocality || r.subLocality || r.locality || 
-                        r.village || r.area || r.street || r.poi ||
-                        r.houseNumber;
-      const cityName = r.city || r.district || r.subDistrict || "";
-      const stateName = r.state || "";
-      
-      const cleanLocal = localName?.trim();
-      const cleanCity = cityName?.trim();
-      
+      // Extract ALL possible name fields - priority: most local first
+      const area = r.subSubLocality || r.subLocality || r.locality || 
+                   r.village || r.area || r.street || r.poi || "";
+      const city = r.city || r.district || r.subDistrict || "";
+      const state = r.state || "";
+      const pincode = r.pincode || "";
+
+      const cleanArea = area.trim();
+      const cleanCity = city.trim();
+      const cleanState = state.trim();
+
+      // Store structured data for form autofill
+      currentLocation._geoData = { area: cleanArea, city: cleanCity, state: cleanState, pincode };
+
       let displayName;
-      if (cleanLocal && cleanCity && cleanLocal !== cleanCity) {
-        displayName = `${cleanLocal}, ${cleanCity}`;
-      } else if (cleanLocal) {
-        displayName = cleanLocal;
+      if (cleanArea && cleanCity && cleanArea.toLowerCase() !== cleanCity.toLowerCase()) {
+        displayName = `${cleanArea}, ${cleanCity}`;
+      } else if (cleanArea) {
+        displayName = cleanArea;
       } else if (cleanCity) {
-        // Try formatted_address for local detail
+        // Try formatted_address parts
         const fa = r.formatted_address || "";
-        const parts = fa.split(",").map(s => s.trim()).filter(s => s && s !== cleanCity && s !== stateName && s !== "India");
+        const parts = fa.split(",").map(s=>s.trim()).filter(s=>s&&s!==cleanCity&&s!==cleanState&&s!=="India"&&!/^\d{6}$/.test(s));
         displayName = parts.length > 0 ? `${parts[0]}, ${cleanCity}` : cleanCity;
       }
       
       if (displayName) {
-        const fullAddr = [cleanCity, stateName].filter(Boolean).join(", ");
+        const fullAddr = [cleanCity, cleanState].filter(Boolean).join(", ");
         if (setLocation(displayName, fullAddr)) return;
       }
     }
@@ -1456,6 +1469,11 @@ function showAddressDetailsForm(locationName, locationAddr, existingAddr, editId
       </div>
 
       <div style="margin-bottom:16px;">
+        <!-- Auto-filled area from geocode -->
+        <input id="addrStreet" placeholder="Area / Street (auto-filled)"
+          value="${existingAddr?.street || (currentLocation?._geoData?.area ? currentLocation._geoData.area + (currentLocation._geoData.city ? ', ' + currentLocation._geoData.city : '') : '')}"
+          style="width:100%;padding:14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px;background:#f8fafc;"
+          onfocus="this.style.borderColor='#16a34a'" onblur="this.style.borderColor='#e2e8f0'">
         <input id="addrLandmark" placeholder="Landmark (optional) — e.g. Near Shiv Mandir"
           value="${existingAddr?.landmark || ''}"
           style="width:100%;padding:14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
@@ -1612,8 +1630,9 @@ window.saveAddressDetails = function(locationName, locationAddr) {
     return;
   }
 
-  // Build full address
-  const parts = [floor, locationName, landmark, locationAddr].filter(Boolean);
+  const street = document.getElementById("addrStreet")?.value.trim();
+  // Build full address: House, Street/Area, Landmark, City
+  const parts = [floor, street || locationName, landmark].filter(Boolean);
   const fullAddress = parts.join(", ");
 
   // Save to localStorage
